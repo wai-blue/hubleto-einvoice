@@ -1,0 +1,7 @@
+<h1 class="app-main-title">{{ translate('Exports') }}</h1>
+
+<hblreact-table-exports
+  string:tag="table-exports"
+  int:record-id="{{ viewParams.recordId }}"
+  json:filters='{{ viewParams.filters|json_encode }}'
+></hblreact-table-exports>

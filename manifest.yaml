@@ -1,0 +1,9 @@
+namespace: Hubleto\App\Enterprise\Einvoice
+appType: enterprise
+sidebarGroup: finance
+rootUrlSlug: einvoice
+name: Einvoice
+icon: fas fa-file-invoice
+highlight: Einvoice
+author:
+  company: "Hubleto"
