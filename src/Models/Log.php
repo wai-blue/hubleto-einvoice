@@ -1,6 +1,6 @@
 <?php
 
-namespace Hubleto\App\Enterprise\Einvoice\Models;
+namespace Hubleto\App\External\WaiBlue\Einvoice\Models;
 
 use Hubleto\Framework\Db\Column\DateTime;
 use Hubleto\Framework\Db\Column\Integer;
@@ -18,13 +18,13 @@ class Log extends \Hubleto\Erp\Model
   public string $recordManagerClass = RecordManagers\Log::class;
 
   public array $relations = [
-    'EXPORT' => [self::BELONGS_TO, Export::class, 'id_export'],
+    'EINVOICE' => [self::BELONGS_TO, Einvoice::class, 'id_einvoice'],
   ];
 
   public function describeColumns(): array
   {
     return array_merge(parent::describeColumns(), [
-      'id_export' => (new Lookup($this, $this->translate('Export'), Export::class))->setRequired()->setDefaultVisible(),
+      'id_einvoice' => (new Lookup($this, $this->translate('e-Invoice'), Einvoice::class))->setRequired()->setDefaultVisible(),
       'action_type' => (new Varchar($this, $this->translate('Action Type')))->setDefaultVisible(),
       'status' => (new Integer($this, $this->translate('Status')))->setEnumValues([
         self::STATUS_INFO => $this->translate('Info'),

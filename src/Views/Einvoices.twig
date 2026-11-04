@@ -1,0 +1,33 @@
+<h1 class="app-main-title">{{ translate('e-Invoice') }}</h1>
+
+{% if viewParams.invoiceSyncResult %}
+  <div class="badge badge-info mb-2">
+    {{ translate('Provider invoices synchronized.') }}
+    {{ translate('Found') }}: {{ viewParams.invoiceSyncResult.found }},
+    {{ translate('Imported') }}: {{ viewParams.invoiceSyncResult.imported }},
+    {{ translate('Updated') }}: {{ viewParams.invoiceSyncResult.updated }},
+    {{ translate('Linked') }}: {{ viewParams.invoiceSyncResult.linked }},
+    {{ translate('Unchanged') }}: {{ viewParams.invoiceSyncResult.unchanged }}.
+    {% if viewParams.invoiceSyncResult.cycleCompleted %}
+      {{ translate('All provider invoices were checked.') }}
+    {% else %}
+      {{ translate('Click sync again to process the next batch.') }}
+    {% endif %}
+  </div>
+  {% for warning in viewParams.invoiceSyncResult.warnings %}
+    <div class="badge badge-warning mb-2">{{ warning }}</div>
+  {% endfor %}
+{% endif %}
+
+{% if viewParams.invoiceSyncError %}
+  <div class="badge badge-danger mb-2">{{ viewParams.invoiceSyncError }}</div>
+{% endif %}
+
+<hblreact-table-einvoices
+  string:tag="table-einvoices"
+  int:record-id="{{ viewParams.recordId }}"
+  string:fulltext-search='{{ viewParams.q }}'
+  json:column-search='{{ viewParams.search|json_encode }}'
+  json:filters='{{ viewParams.filters|json_encode }}'
+  string:form-active-tab-uid='{{ viewParams.tab }}'
+></hblreact-table-einvoices>

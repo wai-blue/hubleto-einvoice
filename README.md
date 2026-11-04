@@ -1,52 +1,167 @@
-# Hubleto EInvoice
+# Hubleto e-Invoice
 
-Hubleto EInvoice app for generating PEPPOL-compatible XML invoices.
+external application for sending and receiving electronic invoices
+through providers connected to Hubleto.
 
-## Description
+## Features
 
-The application allows users to select an invoice from the system. Upon selection, it automatically generates a valid PEPPOL-compatible XML file. The generated XML passes validation standards without fatal errors.
+- UBL 2.1 XML generation using `num-num/ubl-invoice` for Peppol invoicing.
+- EPOSTAK, Qvalia, Fitek and MRP provider adapters.
+- Fitek-specific sales-invoice XML conversion.
+- Sending invoices, checking provider statuses and downloading stored XML.
+- Importing incoming and outgoing documents from the selected provider.
+- Creating inbound Hubleto invoices from received documents.
+- Matching suppliers, purchase orders and order items during inbound import.
+- Status and direction filters, notifications and invoice change listeners.
 
-## Usage
+## Installation
 
-1.  Select a desired invoice.
-2.  Click Add to generate the export.
-3.  The system automatically generates a valid PEPPOL-compatible XML file.
-4.  Click the download XML button to download the selected XML file for validation purposes
+Requires an existing Hubleto installation, PHP 8.2 or newer, and the curl, DOM
+and SimpleXML extensions. Required Hubleto apps are listed in `src/manifest.yaml`.
 
-## Screenshots
 
-### Export List
-![Export List](img/exports.png)
+### 1. Add the local repository
 
-### UBL 2.1 XML Output
-![XML Output](img/xml.png)
+Place this repository alongside your Hubleto project, for example:
 
-### Validation Success
-![Validation Success](img/validation.png)
+```text
+www/
+  hubleto/
+  hubleto-einvoice/
+```
 
-## Status
+In the Hubleto project's `composer.json`, add the following entry to
+`repositories`, keeping any existing repository entries:
 
-> **Work in Progress**
+```json
+{
+  "repositories": {
+    "wai-blue/hubleto-einvoice": {
+      "type": "path",
+      "url": "../hubleto-einvoice"
+    }
+  }
+}
+```
 
-The application is in a functional state but is considered a Work in Progress.
+Adjust the path if your directory layout differs.
 
-*   **Core Functionality**: Generating correct XML from invoice data is done and usable.
-*   **API Integration**: The app is ready for connecting to a provider's API.
-*   **Visuals**: Minor UI/UX adjustments are needed.
+### 2. Install the Composer package
 
-## Known Limitations
+Run from the Hubleto project's root:
 
-*   **Debug Mode**: Some debug outputs and test parts are intentionally left in the code to assist with API integration tuning.
-*   **Visuals**: Some UI elements might require further refinement.
+```sh
+composer require wai-blue/hubleto-einvoice
+```
 
-## Dependencies
+Composer installs the package and its UBL library dependency and configures
+autoloading for the external app.
 
-This application requires the **num-num** library to be installed.
+### 3. Install the app in Hubleto
 
-> **IMPORTANT**: The `num-num` library is mandatory for this app to function.
+From the same Hubleto project directory, run:
 
-*   [num-num/ubl-invoice](https://github.com/num-num/ubl-invoice)
+```sh
+php hubleto app install Hubleto/App/External/WaiBlue/Einvoice
+```
 
-## Credits
+Compile frontend assets through the host project's normal build process,
+including this app's `src/Loader.tsx` in its bundle.
 
-Special thanks to the **num-num** library used for UBL file generation.
+These steps describe a new installation. The external and enterprise versions
+share URLs and database tables and must not be enabled together. Existing
+enterprise configuration and migration history are not transferred automatically;
+review that transition before installing over an existing database.
+
+## Provider setup
+
+1. Open **e-Invoice > Providers** or `/settings/einvoice`.
+2. Select a provider and enter the credentials issued for your company.
+3. Click **Save and use provider** to activate it.
+
+| Provider | Configuration |
+| --- | --- |
+| EPOSTAK | API base URL, OAuth client ID and secret, default receiver Peppol scheme |
+| Qvalia | API base URL, API key and AccountRegNo |
+| Fitek | API base URL, Integrator ID and authorization token |
+| MRP | API base URL, Client ID, Client secret and participant Identifier |
+
+Use the provider's sandbox URL and test participants when testing. Available
+document formats, statuses and XML downloads depend on the provider API.
+
+## Sending invoices
+
+1. Configure a company and invoicing profile in Hubleto Invoices, including
+   the supplier identification, address, currency and payment details.
+2. Create an outbound invoice with its customer and invoice items.
+3. Invoice model events create a linked e-Invoice and refresh unsent documents
+   when the invoice changes. To add an existing invoice manually, use
+   **Add e-invoice** and select the linked **Invoice**.
+4. Open the e-Invoice and click **Send to provider**.
+
+Before sending, the app regenerates XML from the linked invoice and runs the
+selected provider's preflight checks. A successful send stores the provider's
+transmission ID for tracking; it does not necessarily mean final delivery.
+
+Use **Sync remote status** in the record to check its progress and
+**Download XML** to download the locally stored document. Inspect the response
+and error fields if sending fails. Records already tracked by a provider cannot
+be deleted or sent again through the send action.
+
+## Receiving invoices
+
+1. Click **Sync from provider** in the e-Invoice sidebar.
+2. Select **Inbound** and open a received document.
+3. Click **Create Hubleto invoice** to import it into Hubleto Invoices.
+
+Creating a Hubleto invoice requires the document's XML. The app uses the local
+XML when available; otherwise it requests it from the provider. A document can
+appear in the synchronized list even when its XML is unavailable for import.
+
+During import, the app:
+
+- reuses a local supplier matching DIČ, IČ DPH or IČO, in that order, or creates
+  a supplier from the XML;
+- links an existing inbound invoice with the same supplier and external invoice
+  number, instead of creating another one;
+- otherwise creates an inbound invoice using the configured invoicing profile,
+  preserving the supplier's number as its external number;
+- matches a purchase order using the supplier and order reference, or creates
+  a new purchase order when no match is found;
+- matches unlinked order items by their descriptions, quantities, prices,
+  discounts and VAT rates, using an order-line reference when applicable,
+  or creates missing items, then links them to the invoice items.
+
+Create an invoicing profile and configure the required currency before import.
+Once linked, the action becomes **Open Hubleto invoice**. Repeating the import
+uses the existing link.
+
+## Synchronization
+
+**Sync from provider** checks incoming and outgoing documents for the selected
+provider, processing at most 100 per click. The next click continues the saved
+position. Existing records are updated or counted as unchanged. After a complete
+cycle, the next synchronization starts a new cycle.
+
+The app synchronizes all documents exposed by the configured provider account.
+A shared sandbox may therefore return other users' documents as well.
+
+**Sync statuses now** refreshes sent records with a transmission ID. A registered
+cron performs the same status update hourly (`0 * * * *`) when the host Hubleto
+cron runner is scheduled. It does not fetch new provider invoices automatically.
+The sidebar shows the timestamps of the manual synchronization actions.
+
+## Statuses
+
+| Status | Meaning |
+| --- | --- |
+| Pending | Initial or pending state, depending on the document and provider. |
+| Waiting to be sent | XML has been generated and the document has not been sent. |
+| Sent | Sent or accepted for processing; further status synchronization may be needed. |
+| Confirmed | Provider status mapped to confirmation or delivery. |
+| Failed | Generation, preflight, sending or provider processing reported a failure. |
+| Will not be sent | Sending is disabled and the record is excluded from unsent reminders. |
+
+Use the **Status**, **Inbound** and **Outbound** filters to narrow the list.
+Sidebar badges and priority notifications count documents waiting to be sent
+and failed documents. Delivery confirmation does not indicate invoice payment.

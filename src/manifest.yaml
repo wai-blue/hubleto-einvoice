@@ -1,0 +1,17 @@
+namespace: Hubleto\App\External\WaiBlue\Einvoice
+appType: external
+sidebarGroup: finance
+rootUrlSlug: einvoice
+name: e-Invoice
+icon: fas fa-file-invoice
+highlight: e-Invoice
+author:
+  company: "WAI.blue"
+requires:
+  - Hubleto\App\Community\Auth
+  - Hubleto\App\Community\Settings
+  - Hubleto\App\Community\Desktop
+  - Hubleto\App\Community\Documents
+  - Hubleto\App\Community\Invoices
+  - Hubleto\App\Community\Suppliers
+  - Hubleto\App\Community\Orders

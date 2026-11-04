@@ -1,6 +1,6 @@
 <?php
 
-namespace Hubleto\App\Enterprise\Einvoice;
+namespace Hubleto\App\External\WaiBlue\Einvoice\Services;
 
 use NumNum\UBL\AccountingParty;
 use NumNum\UBL\Address;
@@ -37,6 +37,7 @@ class XmlGenerator
   private const CUSTOMIZATION_ID = 'urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0';
   private const PROFILE_ID = 'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0';
   private const DEFAULT_CURRENCY = 'EUR';
+  private const DEFAULT_PEPPOL_SCHEME = '0245';
 
   private const COUNTRY_MAP = [
     'SVK' => 'SK',
@@ -131,32 +132,37 @@ class XmlGenerator
     $countryCode = self::COUNTRY_MAP[$countryCode] ?? (strlen($countryCode) === 2 ? strtoupper($countryCode) : 'SK');
 
     $address = (new Address())
-      ->setStreetName($company['street_1'] ?? '')
-      ->setCityName($company['city'] ?? '')
-      ->setPostalZone($company['zip'] ?? '')
       ->setCountry((new Country())->setIdentificationCode($countryCode));
 
+    if (!empty($company['street_1'])) { $address->setStreetName($company['street_1']); }
+    if (!empty($company['city'])) { $address->setCityName($company['city']); }
+    if (!empty($company['zip'])) { $address->setPostalZone($company['zip']); }
     if (!empty($company['street_2'])) { $address->setAdditionalStreetName($company['street_2']); }
 
-    $name = $profile['name'] ?? $company['name'] ?? '';
+    $name = $company['name'] ?? $profile['name'] ?? '';
 
     $party = (new Party())
       ->setName($name)
       ->setPostalAddress($address);
 
-    if (!empty($company['registration_id'])) { $party->setPartyIdentificationId($company['registration_id']); }
+    if (!empty($company['company_id'])) { $party->setPartyIdentificationId($company['company_id']); }
+    $supplierEndpoint = $this->resolveEndpoint($company['peppol_id'] ?? null, $company['tax_id'] ?? $company['vat_id'] ?? null);
+    if ($supplierEndpoint) {
+      $party->setEndpointId($supplierEndpoint['identifier'], $supplierEndpoint['scheme']);
+    }
 
-    if (!empty($company['vat_id'])) {
+    $supplierVatId = $this->normalizeVatId($company['vat_id'] ?? null, $countryCode);
+    if (!empty($supplierVatId)) {
       $party->setPartyTaxScheme((new PartyTaxScheme())
-        ->setCompanyId($company['vat_id'])
+        ->setCompanyId($supplierVatId)
         ->setTaxScheme((new TaxScheme())->setId('VAT')));
     }
 
     $legalEntity = (new LegalEntity())->setRegistrationName($name);
-    if (!empty($company['tax_id'])) {
+    if (!empty($company['company_id'])) {
+      $legalEntity->setCompanyId($company['company_id']);
+    } elseif (!empty($company['tax_id'])) {
       $legalEntity->setCompanyId($company['tax_id']);
-    } elseif (!empty($company['registration_id'])) {
-      $legalEntity->setCompanyId($company['registration_id']);
     }
     $party->setLegalEntity($legalEntity);
 
@@ -180,11 +186,11 @@ class XmlGenerator
     $countryCode = self::COUNTRY_MAP[$countryCode] ?? (strlen($countryCode) === 2 ? strtoupper($countryCode) : 'SK');
 
     $address = (new Address())
-      ->setStreetName($customer['street_line_1'] ?? '')
-      ->setCityName($customer['city'] ?? '')
-      ->setPostalZone($customer['postal_code'] ?? '')
       ->setCountry((new Country())->setIdentificationCode($countryCode));
 
+    if (!empty($customer['street_line_1'])) { $address->setStreetName($customer['street_line_1']); }
+    if (!empty($customer['city'])) { $address->setCityName($customer['city']); }
+    if (!empty($customer['postal_code'])) { $address->setPostalZone($customer['postal_code']); }
     if (!empty($customer['street_line_2'])) { $address->setAdditionalStreetName($customer['street_line_2']); }
 
     $name = $customer['name'] ?? '';
@@ -193,16 +199,25 @@ class XmlGenerator
       ->setName($name)
       ->setPostalAddress($address);
 
-    if (!empty($customer['customer_id'])) { $party->setPartyIdentificationId($customer['customer_id']); }
+    if (!empty($customer['company_id'])) { $party->setPartyIdentificationId($customer['company_id']); }
+    $customerEndpoint = $this->resolveEndpoint($customer['peppol_id'] ?? null, $customer['tax_id'] ?? $customer['vat_id'] ?? null);
+    if ($customerEndpoint) {
+      $party->setEndpointId($customerEndpoint['identifier'], $customerEndpoint['scheme']);
+    }
 
-    if (!empty($customer['vat_id'])) {
+    $customerVatId = $this->normalizeVatId($customer['vat_id'] ?? null, $countryCode);
+    if (!empty($customerVatId)) {
       $party->setPartyTaxScheme((new PartyTaxScheme())
-        ->setCompanyId($customer['vat_id'])
+        ->setCompanyId($customerVatId)
         ->setTaxScheme((new TaxScheme())->setId('VAT')));
     }
 
     $legalEntity = (new LegalEntity())->setRegistrationName($name);
-    if (!empty($customer['tax_id'])) { $legalEntity->setCompanyId($customer['tax_id']); }
+    if (!empty($customer['company_id'])) {
+      $legalEntity->setCompanyId($customer['company_id']);
+    } elseif (!empty($customer['tax_id'])) {
+      $legalEntity->setCompanyId($customer['tax_id']);
+    }
     $party->setLegalEntity($legalEntity);
 
     if (!empty($customer['email']) || !empty($customer['phone'])) {
@@ -364,5 +379,44 @@ class XmlGenerator
     if ($rate == 0) return 'Z';
     if ($rate < 10) return 'AA';
     return 'S';
+  }
+
+  private function resolveEndpoint(?string $explicitPeppolId, ?string $fallbackIdentifier): ?array
+  {
+    $explicitPeppolId = trim((string) $explicitPeppolId);
+    if ($explicitPeppolId !== '') {
+      $parts = explode(':', $explicitPeppolId, 2);
+      if (count($parts) === 2 && $parts[0] !== '' && $parts[1] !== '') {
+        return [
+          'scheme' => $parts[0],
+          'identifier' => $parts[1],
+        ];
+      }
+    }
+
+    $identifier = preg_replace('/[^0-9]/', '', (string) $fallbackIdentifier);
+    if ($identifier === '') {
+      return null;
+    }
+
+    return [
+      'scheme' => self::DEFAULT_PEPPOL_SCHEME,
+      'identifier' => $identifier,
+    ];
+  }
+
+  private function normalizeVatId(?string $vatId, string $countryCode): ?string
+  {
+    $vatId = strtoupper(trim((string) $vatId));
+    if ($vatId === '') {
+      return null;
+    }
+
+    $normalizedCountryCode = strtoupper($countryCode);
+    if (str_starts_with($vatId, $normalizedCountryCode)) {
+      return $vatId;
+    }
+
+    return $normalizedCountryCode . preg_replace('/\s+/', '', $vatId);
   }
 }

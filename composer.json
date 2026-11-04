@@ -1,0 +1,19 @@
+{
+  "name": "wai-blue/hubleto-einvoice",
+  "description": "Electronic invoicing and Peppol provider integration for Hubleto",
+  "type": "library",
+  "license": "MIT",
+  "require": {
+    "php": "^8.2",
+    "ext-curl": "*",
+    "ext-dom": "*",
+    "ext-simplexml": "*",
+    "num-num/ubl-invoice": "^2.4"
+  },
+  "autoload": {
+    "psr-4": {
+      "Hubleto\\App\\External\\WaiBlue\\Einvoice\\": "src/"
+    }
+  },
+  "minimum-stability": "stable"
+}

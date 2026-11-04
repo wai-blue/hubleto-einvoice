@@ -1,7 +1,8 @@
 <?php
 // only for testing and debugging purposes, delete later
-namespace Hubleto\App\Enterprise\Einvoice\Controllers\Api;
+namespace Hubleto\App\External\WaiBlue\Einvoice\Controllers\Api;
 
+use Hubleto\App\Community\Documents\Generator;
 use Hubleto\App\Community\Invoices\Models\Invoice;
 use Hubleto\Erp\Controllers\ApiController;
 
@@ -22,7 +23,9 @@ class DebugInvoiceData extends ApiController
       throw new \Exception('Invoice not found');
     }
 
-    $invoiceData = $mInvoice->getPreviewVars($invoiceId);
+    /** @var Generator $generator */
+    $generator = $this->getService(Generator::class);
+    $invoiceData = $generator->getPreviewVars(Invoice::class, $invoiceId);
     if (isset($invoiceData['hubleto'])) {
       unset($invoiceData['hubleto']);
     }
