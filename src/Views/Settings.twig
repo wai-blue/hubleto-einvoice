@@ -51,6 +51,10 @@
       </div>
     </div>
 
+    {% if viewParams.providerDefinition.setupHint|default('') %}
+      <div class="px-4 pb-4 text-sm text-gray-500">{{ translate(viewParams.providerDefinition.setupHint) }}</div>
+    {% endif %}
+
     <form id="settings-form" action="" method="POST">
       <input type="hidden" name="settingsChanged" value="1">
       <input type="hidden" name="providerName" value="{{ viewParams.providerName }}">

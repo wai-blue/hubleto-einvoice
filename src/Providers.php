@@ -49,6 +49,20 @@ class Providers
           'authorizationToken' => ['label' => 'Authorization token', 'type' => 'password', 'default' => ''],
         ],
       ],
+      'eaglessoft' => [
+        'name' => 'Eaglessoft (DocNaut)',
+        'description' => 'Electronic invoice exchange through the DocNaut Peppol access point.',
+        'setupHint' => 'Enter your Client ID and Client secret. The company and subscription are detected automatically. Keep the default API URLs for sandbox testing.',
+        'logoUrl' => 'https://portal-staging.docnaut.com/favicons/favicon.png',
+        'available' => true,
+        'providerClass' => Providers\EaglessoftProvider::class,
+        'fields' => [
+          'clientId' => ['label' => 'Client ID', 'type' => 'text', 'default' => ''],
+          'clientSecret' => ['label' => 'Client secret', 'type' => 'password', 'default' => ''],
+          'baseUrl' => ['label' => 'API base URL', 'type' => 'text', 'default' => 'https://portal-staging.docnaut.com'],
+          'graphUrl' => ['label' => 'Graph API URL', 'type' => 'text', 'default' => 'https://graph-staging.docnaut.com'],
+        ],
+      ],
       'mrp' => [
         'name' => 'MRP Digitálny poštár',
         'description' => 'Electronic invoice exchange through the MRP Peppol access point.',
