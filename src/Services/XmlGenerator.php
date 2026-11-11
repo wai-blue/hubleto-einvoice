@@ -156,6 +156,10 @@ class XmlGenerator
       $party->setPartyTaxScheme((new PartyTaxScheme())
         ->setCompanyId($supplierVatId)
         ->setTaxScheme((new TaxScheme())->setId('VAT')));
+    } elseif (trim((string) ($company['tax_id'] ?? '')) !== '') {
+      $party->setPartyTaxScheme((new PartyTaxScheme())
+        ->setCompanyId(trim((string) $company['tax_id']))
+        ->setTaxScheme((new TaxScheme())->setId('FC')));
     }
 
     $legalEntity = (new LegalEntity())->setRegistrationName($name);

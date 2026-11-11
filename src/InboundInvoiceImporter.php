@@ -2,6 +2,7 @@
 
 namespace Hubleto\App\External\WaiBlue\Einvoice;
 
+use Hubleto\App\Community\Invoices\Controllers\Api\GenerateInvoiceNumber;
 use Hubleto\App\Community\Invoices\Models\Invoice;
 use Hubleto\App\Community\Invoices\Models\Item as InvoiceItem;
 use Hubleto\App\Community\Invoices\Models\Profile;
@@ -92,7 +93,7 @@ class InboundInvoiceImporter
           'notes' => $data['note'],
         ])['id'];
 
-        // recordCreate() intentionally generates the local invoice number and defaults.
+        $this->generateInvoiceNumber($invoiceId);
         $invoice = $mInvoice->record->find($invoiceId);
         $invoice->update([
           'date_issue' => $data['issueDate'],
@@ -165,6 +166,29 @@ class InboundInvoiceImporter
         );
       }
     );
+  }
+
+  private function generateInvoiceNumber(int $invoiceId): void
+  {
+    $invoice = $this->app->getModel(Invoice::class)->record->find($invoiceId);
+    if (trim((string) $invoice?->number) !== '') return;
+
+    // Reuse the Invoices action without leaving its parameter on the import request.
+    $router = $this->app->router();
+    $previousParams = $router->getUrlParams();
+    try {
+      $router->setUrlParam('idInvoice', (string) $invoiceId);
+      $result = $this->app->getService(GenerateInvoiceNumber::class)->renderJson();
+      if (trim((string) ($result['number'] ?? '')) === '') {
+        throw new \Exception('The invoice profile did not generate an invoice number.');
+      }
+    } finally {
+      if (array_key_exists('idInvoice', $previousParams)) {
+        $router->setUrlParam('idInvoice', $previousParams['idInvoice']);
+      } else {
+        $router->removeUrlParam('idInvoice');
+      }
+    }
   }
 
   private function xmlContent(mixed $export): string
@@ -456,8 +480,8 @@ class InboundInvoiceImporter
   {
     /** @var Profile $model */
     $model = $this->app->getModel(Profile::class);
-    $profile = $model->record->where('invoice_profiles.is_default', 1)->first();
-    $profile ??= $model->record->orderBy('invoice_profiles.id')->first();
+    $profile = $model->record->where('invoice_profiles.is_default', 1)->lockForUpdate()->first();
+    $profile ??= $model->record->orderBy('invoice_profiles.id')->lockForUpdate()->first();
     if (!$profile) throw new \Exception('Create an invoicing profile before importing an inbound e-Invoice.');
     return $profile;
   }
