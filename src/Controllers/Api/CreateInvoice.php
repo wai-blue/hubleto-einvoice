@@ -22,7 +22,7 @@ class CreateInvoice extends ApiController
     return [
       'status' => 'success',
       'message' => $result['created']
-        ? 'Inbound Hubleto invoice created and linked to a purchase order.'
+        ? 'Inbound Hubleto invoice created.'
         : 'The inbound Hubleto invoice already exists.',
       'result' => $result,
     ];

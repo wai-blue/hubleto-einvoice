@@ -102,27 +102,28 @@ class InboundInvoiceImporter
           'vs' => $data['paymentId'],
         ]);
 
-        [$order, $orderCreated] = $this->order($data, $supplier, $currency);
-        $usedOrderItemIds = [];
-        $orderItemsCreated = 0;
-        $orderItemsMatched = 0;
+        // Purchase-order integration is temporarily disabled for inbound invoices.
+        // [$order, $orderCreated] = $this->order($data, $supplier, $currency);
+        // $usedOrderItemIds = [];
+        // $orderItemsCreated = 0;
+        // $orderItemsMatched = 0;
 
         /** @var InvoiceItem $mInvoiceItem */
         $mInvoiceItem = $this->app->getModel(InvoiceItem::class);
-        /** @var OrderItem $mOrderItem */
-        $mOrderItem = $this->app->getModel(OrderItem::class);
+        // /** @var OrderItem $mOrderItem */
+        // $mOrderItem = $this->app->getModel(OrderItem::class);
         foreach ($data['items'] as $position => $item) {
-          [$orderItem, $orderItemCreated] = $this->orderItem(
-            (int) $order->id,
-            $item,
-            $position + 1,
-            $usedOrderItemIds,
-          );
+          // [$orderItem, $orderItemCreated] = $this->orderItem(
+          //   (int) $order->id,
+          //   $item,
+          //   $position + 1,
+          //   $usedOrderItemIds,
+          // );
 
           $invoiceItemId = (int) $mInvoiceItem->record->recordCreate([
             'id_invoice' => $invoiceId,
-            'id_order' => $order->id,
-            'id_order_item' => $orderItem->id,
+            // 'id_order' => $order->id,
+            // 'id_order_item' => $orderItem->id,
             'item' => $item['description'],
             'unit_price' => $item['unitPrice'],
             'amount' => $item['quantity'],
@@ -131,20 +132,20 @@ class InboundInvoiceImporter
             'date_delivery' => $item['deliveryDate'] ?? $data['deliveryDate'] ?? $data['issueDate'],
           ])['id'];
 
-          $mOrderItem->record
-            ->where('orders_items.id', $orderItem->id)
-            ->update(['id_invoice_item' => $invoiceItemId]);
+          // $mOrderItem->record
+          //   ->where('orders_items.id', $orderItem->id)
+          //   ->update(['id_invoice_item' => $invoiceItemId]);
 
-          $usedOrderItemIds[] = (int) $orderItem->id;
-          if ($orderItemCreated) {
-            $orderItemsCreated++;
-          } else {
-            $orderItemsMatched++;
-          }
+          // $usedOrderItemIds[] = (int) $orderItem->id;
+          // if ($orderItemCreated) {
+          //   $orderItemsCreated++;
+          // } else {
+          //   $orderItemsMatched++;
+          // }
         }
 
         $mInvoice->recalculateTotalsForInvoice($invoiceId);
-        $this->recalculateOrder((int) $order->id);
+        // $this->recalculateOrder((int) $order->id);
         $export->update([
           'id_invoice' => $invoiceId,
           'invoice_number' => $data['number'],
@@ -152,17 +153,17 @@ class InboundInvoiceImporter
         $this->log(
           $einvoiceId,
           'hubleto_invoice_created',
-          'Inbound Hubleto invoice created and linked to purchase order ' . $order->identifier . '.',
+          'Inbound Hubleto invoice created.',
         );
 
         return $this->result(
           $einvoiceId,
           $invoiceId,
           true,
-          (int) $order->id,
-          $orderCreated,
-          $orderItemsMatched,
-          $orderItemsCreated,
+          // (int) $order->id,
+          // $orderCreated,
+          // $orderItemsMatched,
+          // $orderItemsCreated,
         );
       }
     );
