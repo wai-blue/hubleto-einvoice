@@ -2,7 +2,10 @@
 
 namespace Hubleto\App\External\WaiBlue\Einvoice\Controllers;
 
-class Settings extends \Hubleto\Erp\Controller
+use Hubleto\App\External\WaiBlue\Einvoice\Loader;
+use Hubleto\Erp\Controller;
+
+class Settings extends Controller
 {
   public function getBreadcrumbs(): array
   {
@@ -16,13 +19,13 @@ class Settings extends \Hubleto\Erp\Controller
   {
     parent::prepareView();
 
-    /** @var \Hubleto\App\External\WaiBlue\Einvoice\Loader $einvoiceApp */
-    $einvoiceApp = $this->appManager()->getApp(\Hubleto\App\External\WaiBlue\Einvoice\Loader::class);
+    /** @var Loader $einvoiceApp */
+    $einvoiceApp = $this->appManager()->getApp(Loader::class);
     $providers = $einvoiceApp->providers();
     $providerDefinitions = $providers->getProviderDefinitions();
     $settingsChanged = $this->router()->urlParamAsBool('settingsChanged');
 
-    if ($settingsChanged) {
+    if ($settingsChanged && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
       $providerName = strtolower(trim((string) $this->router()->urlParamAsString('providerName')));
       if (!isset($providerDefinitions[$providerName]) || !($providerDefinitions[$providerName]['available'] ?? false)) {
         throw new \Exception($this->translate('Unsupported e-invoice provider.'));
@@ -31,6 +34,11 @@ class Settings extends \Hubleto\Erp\Controller
       $providerConfigs = $providers->getProviderConfigs();
       $currentProviderConfig = $providerConfigs[$providerName] ?? [];
       $providerConfig = $currentProviderConfig;
+      $providerConfig['autoCreateInvoices'] = $this->router()->urlParamAsBool('autoCreateInvoices') ? '1' : '0';
+      $providerConfig['notificationEmail'] = trim($this->router()->urlParamAsString('notificationEmail'));
+      if ($providerConfig['notificationEmail'] !== '' && !filter_var($providerConfig['notificationEmail'], FILTER_VALIDATE_EMAIL)) {
+        throw new \Exception($this->translate('Enter a valid notification email address.'));
+      }
 
       foreach ($providerDefinitions[$providerName]['fields'] as $fieldName => $field) {
         $value = trim((string) $this->router()->urlParamAsString($fieldName));

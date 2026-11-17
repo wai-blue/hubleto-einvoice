@@ -325,10 +325,11 @@ class InboundInvoiceImporter
   {
     $items = [];
     foreach ($invoice->xpath('.//InvoiceItemGroup/ItemEntry') ?: [] as $line) {
-      $quantity = abs((float) $this->plainValue($line, './ItemDetailInfo/ItemAmount'));
-      if ($quantity == 0.0) {
-        throw new \Exception('An inbound e-Invoice line has an invalid quantity.');
-      }
+      $quantity = $this->lineQuantity(
+        $this->plainValue($line, './ItemDetailInfo/ItemAmount'),
+        $this->plainValue($line, './ItemDetailInfo/ItemPrice'),
+        $this->plainValue($line, './ItemSum'),
+      );
 
       $unitPrice = (float) $this->plainValue($line, './ItemDetailInfo/ItemPrice');
       $gross = $quantity * $unitPrice;
@@ -384,10 +385,15 @@ class InboundInvoiceImporter
   {
     $items = [];
     foreach ($this->xmlNodes($ubl, "./cac:{$lineName}") as $line) {
-      $quantity = abs((float) $this->xmlValue($line, "./cbc:{$quantityName}"));
-      $baseQuantity = (float) $this->xmlValue($line, './cac:Price/cbc:BaseQuantity') ?: 1;
-      if ($quantity == 0.0 || $baseQuantity == 0.0) {
-        throw new \Exception('An inbound e-Invoice line has an invalid quantity.');
+      $quantity = $this->lineQuantity(
+        $this->xmlValue($line, "./cbc:{$quantityName}"),
+        $this->xmlValue($line, './cac:Price/cbc:PriceAmount'),
+        $this->xmlValue($line, './cbc:LineExtensionAmount'),
+      );
+      $baseQuantityValue = $this->xmlValue($line, './cac:Price/cbc:BaseQuantity');
+      $baseQuantity = $baseQuantityValue === '' ? 1.0 : (float) $baseQuantityValue;
+      if (($baseQuantityValue !== '' && !is_numeric($baseQuantityValue)) || !is_finite($baseQuantity) || $baseQuantity <= 0) {
+        throw new \Exception('An inbound e-Invoice line has an invalid price base quantity.');
       }
 
       $unitPrice = (float) $this->xmlValue($line, './cac:Price/cbc:PriceAmount') / $baseQuantity;
@@ -412,6 +418,23 @@ class InboundInvoiceImporter
 
     if ($items === []) throw new \Exception('The inbound e-Invoice does not contain any supported lines.');
     return $items;
+  }
+
+  private function lineQuantity(string $quantity, string $price, string $total): float
+  {
+    if (!is_numeric($quantity) || !is_finite((float) $quantity)) {
+      throw new \Exception('An inbound e-Invoice line has an invalid quantity.');
+    }
+
+    $amount = abs((float) $quantity);
+    if ($amount == 0.0 && (
+      !is_numeric($price) || (float) $price != 0.0
+      || !is_numeric($total) || (float) $total != 0.0
+    )) {
+      throw new \Exception('An inbound e-Invoice line has an invalid quantity.');
+    }
+
+    return $amount;
   }
 
   private function xmlValue(SimpleXMLElement $xml, string $path): string

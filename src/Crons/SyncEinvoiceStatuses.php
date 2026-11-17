@@ -2,7 +2,8 @@
 
 namespace Hubleto\App\External\WaiBlue\Einvoice\Crons;
 
-use Hubleto\App\External\WaiBlue\Einvoice\Models\Einvoice;
+use Hubleto\App\External\WaiBlue\Einvoice\Loader;
+use Hubleto\App\External\WaiBlue\Einvoice\Services\Synchronization;
 
 class SyncEinvoiceStatuses extends \Hubleto\Erp\Cron
 {
@@ -10,23 +11,11 @@ class SyncEinvoiceStatuses extends \Hubleto\Erp\Cron
 
   public function run(): void
   {
-    /** @var Einvoice $mEinvoice */
-    $mEinvoice = $this->getModel(Einvoice::class);
-
-    $einvoicesToSync = $mEinvoice->record
-      ->where('status', Einvoice::STATUS_SENT)
-      ->whereNotNull('transmission_id')
-      ->get()
-    ;
-
-    $this->logger()->info('SyncEinvoiceStatuses: syncing ' . $einvoicesToSync->count() . ' sent e-invoices.');
-
-    foreach ($einvoicesToSync as $einvoice) {
-      try {
-        $mEinvoice->syncProviderStatus((int) $einvoice->id);
-      } catch (\Throwable $e) {
-        $this->logger()->error('SyncEinvoiceStatuses: failed for e-invoice #' . $einvoice->id . ': ' . $e->getMessage());
-      }
+    try {
+      $result = (new Synchronization($this->appManager()->getApp(Loader::class)))->run(true, true, 'cron');
+      $this->logger()->info('e-Invoice synchronization: ' . $result['status']);
+    } catch (\Throwable $e) {
+      $this->logger()->error('e-Invoice synchronization: ' . $e->getMessage());
     }
   }
 }

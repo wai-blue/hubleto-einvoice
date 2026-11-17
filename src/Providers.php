@@ -28,7 +28,7 @@ class Providers
       'qvalia' => [
         'name' => 'Qvalia',
         'description' => 'Peppol access point for sending and receiving electronic invoices.',
-        'logoUrl' => 'https://qvalia.com/app/uploads/2024/08/Logo-Icon-Indigo-transparent.png',
+        'logoUrl' => 'https://qvalia.com/app/uploads/2020/10/cropped-favicon-192x192.png',
         'available' => true,
         'providerClass' => Providers\QvaliaProvider::class,
         'fields' => [
@@ -52,7 +52,6 @@ class Providers
       'eaglessoft' => [
         'name' => 'Eaglessoft (DocNaut)',
         'description' => 'Electronic invoice exchange through the DocNaut Peppol access point.',
-        'setupHint' => 'Enter your Client ID and Client secret. The company and subscription are detected automatically. Keep the default API URLs for sandbox testing.',
         'logoUrl' => 'https://portal-staging.docnaut.com/favicons/favicon.png',
         'available' => true,
         'providerClass' => Providers\EaglessoftProvider::class,

@@ -19,7 +19,6 @@ class Loader extends \Hubleto\Erp\App
       '/^einvoice(\/(?<recordId>\d+))?\/?$/' => Controllers\Einvoices::class,
       '/^einvoice\/add\/?$/' => ['controller' => Controllers\Einvoices::class, 'vars' => ['recordId' => -1]],
       '/^settings\/einvoice\/?$/' => Controllers\Settings::class,
-      '/^einvoice\/api\/debug-invoice-data\/(?P<invoiceId>\d+)\/?$/' => Controllers\Api\DebugInvoiceData::class, // only for testing and debugging purposes, delete later
       '/^einvoice\/api\/einvoices\/(?P<einvoiceId>\d+)\/send\/?$/' => Controllers\Api\SendEinvoice::class,
       '/^einvoice\/api\/einvoices\/(?P<einvoiceId>\d+)\/sync-status\/?$/' => Controllers\Api\SyncEinvoiceStatus::class,
       '/^einvoice\/api\/einvoices\/(?P<einvoiceId>\d+)\/create-invoice\/?$/' => Controllers\Api\CreateInvoice::class,
@@ -80,8 +79,9 @@ class Loader extends \Hubleto\Erp\App
 
   public function renderSecondSidebar(): string
   {
-    $lastInvoiceSyncAt = $this->formatSyncTimestamp($this->providers()->providerConfigAsString('lastInvoiceSyncAt'));
-    $lastStatusSyncAt = $this->formatSyncTimestamp($this->providers()->providerConfigAsString('lastStatusSyncAt'));
+    $sync = (new Services\Synchronization($this))->lastResult();
+    $lastInvoiceSyncAt = $this->formatSyncTimestamp($sync['lastDocumentSyncAt'] ?? $this->providers()->providerConfigAsString('lastInvoiceSyncAt'));
+    $lastStatusSyncAt = $this->formatSyncTimestamp($sync['lastStatusSyncAt'] ?? $this->providers()->providerConfigAsString('lastStatusSyncAt'));
 
     return '
       ' . $this->secondSidebarTitle() . '

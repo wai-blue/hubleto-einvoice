@@ -4,14 +4,17 @@ namespace Hubleto\App\External\WaiBlue\Einvoice\Models;
 
 use Hubleto\App\Community\Documents\Generator;
 use Hubleto\App\Community\Invoices\Models\Invoice;
+use Hubleto\App\External\WaiBlue\Einvoice\InboundInvoiceImporter;
+use Hubleto\App\External\WaiBlue\Einvoice\Loader;
 use Hubleto\App\External\WaiBlue\Einvoice\Providers\ProviderInterface;
+use Hubleto\App\External\WaiBlue\Einvoice\Services\XmlGenerator;
+use Hubleto\Erp\EmailProvider;
 use Hubleto\Framework\Db\Column\DateTime;
 use Hubleto\Framework\Db\Column\Integer;
 use Hubleto\Framework\Db\Column\Lookup;
 use Hubleto\Framework\Db\Column\Text;
 use Hubleto\Framework\Db\Column\Varchar;
 use Hubleto\Framework\Enums\InstalledMigrationEnum;
-use Hubleto\App\External\WaiBlue\Einvoice\Services\XmlGenerator;
 
 class Einvoice extends \Hubleto\Erp\Model
 {
@@ -44,8 +47,8 @@ class Einvoice extends \Hubleto\Erp\Model
         self::INBOUND => $this->translate('Inbound'),
         self::OUTBOUND => $this->translate('Outbound'),
       ])->setEnumCssClasses([
-        self::INBOUND => 'bg-lime-50 text-slate-700',
-        self::OUTBOUND => 'bg-yellow-50 text-slate-700',
+        self::INBOUND => 'badge-success',
+        self::OUTBOUND => 'badge-info',
       ])->setDefaultValue(self::OUTBOUND)->setDefaultVisible(),
       'provider' => (new Varchar($this, $this->translate('Provider')))->setDefaultVisible(),
       'invoice_number' => (new Varchar($this, $this->translate('Invoice number')))->setDefaultVisible(),
@@ -58,12 +61,12 @@ class Einvoice extends \Hubleto\Erp\Model
         self::STATUS_FAILED => $this->translate('Failed'),
         self::STATUS_WONT_SEND => $this->translate('Will not be sent'),
       ])->setEnumCssClasses([
-        self::STATUS_PENDING => 'bg-slate-100 text-slate-700',
-        self::STATUS_GENERATED => 'bg-yellow-50 text-slate-700',
-        self::STATUS_SENT => 'bg-blue-50 text-slate-700',
-        self::STATUS_CONFIRMED => 'bg-green-50 text-slate-700',
-        self::STATUS_FAILED => 'bg-red-50 text-slate-700',
-        self::STATUS_WONT_SEND => 'bg-gray-100 text-slate-700',
+        self::STATUS_PENDING => '',
+        self::STATUS_GENERATED => 'badge-warning',
+        self::STATUS_SENT => 'badge-info',
+        self::STATUS_CONFIRMED => 'badge-success',
+        self::STATUS_FAILED => 'badge-danger',
+        self::STATUS_WONT_SEND => '',
       ])->setDefaultValue(self::STATUS_PENDING)->setDefaultVisible(),
       'transmission_id' => (new Varchar($this, $this->translate('Transmission ID')))->setDefaultVisible(),
       'date_generated' => (new DateTime($this, $this->translate('Date generated'))),
@@ -77,6 +80,7 @@ class Einvoice extends \Hubleto\Erp\Model
   public function describeTable(): \Hubleto\Framework\Description\Table
   {
     $description = parent::describeTable();
+    $description->setPermissions(false, null, false, false);
     $description->ui['addButtonText'] = $this->translate('Add e-invoice');
     $description->show(['header', 'fulltextSearch', 'columnSearch', 'moreActionsButton']);
     $description->show(['footer']);
@@ -102,6 +106,25 @@ class Einvoice extends \Hubleto\Erp\Model
     ]);
 
     return $description;
+  }
+
+  public function describeForm(): \Hubleto\Framework\Description\Form
+  {
+    $description = parent::describeForm();
+    $description->ui['readonly'] = true;
+    $description->ui['showSaveButton'] = false;
+    $description->ui['showCopyButton'] = false;
+    $description->ui['showDeleteButton'] = false;
+    foreach (['canCreate', 'canUpdate', 'canDelete'] as $permission) {
+      $description->permissions[$permission] = false;
+    }
+    return $description;
+  }
+
+  public function getPermissions(array $record): array
+  {
+    $permissions = parent::getPermissions($record);
+    return [false, $permissions[1], false, false];
   }
 
   public function onBeforeCreate(array $record): array
@@ -230,22 +253,9 @@ class Einvoice extends \Hubleto\Erp\Model
 
   public function onBeforeDelete(int $id): int
   {
-    $export = $this->record->find($id);
-    if (!$export) {
-      throw new \Hubleto\Framework\Exceptions\RecordSaveException($this->translate('e-Invoice not found'));
-    }
-
-    if ($this->isRemotelyTracked($export)) {
-      throw new \Hubleto\Framework\Exceptions\RecordSaveException(
-        $this->translate('This e-invoice was already sent to the provider and cannot be deleted. Keep the record for tracking.')
-      );
-    }
-
-    /** @var Log $mLog */
-    $mLog = $this->getModel(Log::class);
-    $mLog->record->where('id_einvoice', $id)->delete();
-
-    return parent::onBeforeDelete($id);
+    throw new \Hubleto\Framework\Exceptions\RecordSaveException(
+      $this->translate('e-Invoices are read-only and cannot be deleted. Keep the record for tracking.')
+    );
   }
 
   public function sendToProvider(int $exportId): array
@@ -402,6 +412,10 @@ class Einvoice extends \Hubleto\Erp\Model
       'unchanged' => 0,
       'skipped' => 0,
       'warnings' => [],
+      'hubletoInvoicesCreated' => 0,
+      'hubletoInvoicesLinked' => 0,
+      'autoImportFailed' => 0,
+      'notificationsSent' => 0,
       'batchLimit' => $batchLimit,
       'cycleCompleted' => false,
     ];
@@ -426,16 +440,20 @@ class Einvoice extends \Hubleto\Erp\Model
 
         $summary['found']++;
         $remaining--;
-        $this->reconcileProviderDocument($provider, $document, $summary);
+        try {
+          $this->reconcileProviderDocument($provider, $document, $summary);
+        } catch (\Throwable $e) {
+          $summary['skipped']++;
+          $summary['warnings'][] = 'A provider document could not be synchronized: ' . $e->getMessage();
+        }
       }
 
       $nextCursor = trim((string) ($page['nextCursor'] ?? ''));
       $hasMore = (bool) ($page['hasMore'] ?? false);
-      if ($hasMore && ($nextCursor === '' || $nextCursor === $cursor)) {
+      if ($hasMore && ($documents === [] || $nextCursor === '' || $nextCursor === $cursor)) {
         $summary['warnings'][] = "Provider returned an invalid {$direction} pagination cursor; synchronization stopped.";
         $direction = 'inbound';
         $cursor = null;
-        $summary['cycleCompleted'] = true;
         break;
       }
 
@@ -487,8 +505,7 @@ class Einvoice extends \Hubleto\Erp\Model
 
   private function getProvider(?string $providerCode = null): ProviderInterface
   {
-    /** @var \Hubleto\App\External\WaiBlue\Einvoice\Loader $app */
-    $app = \Hubleto\Erp\Loader::getGlobalApp()->appManager()->getApp(\Hubleto\App\External\WaiBlue\Einvoice\Loader::class);
+    $app = $this->getEinvoiceApp();
     $providerCode = strtolower(trim((string) ($providerCode ?? $app->providers()->getProviderName())));
     $providerClass = $app->providers()->getProviderDefinitions()[$providerCode]['providerClass'] ?? null;
     if (!is_string($providerClass) || !class_exists($providerClass)) {
@@ -576,6 +593,17 @@ class Einvoice extends \Hubleto\Erp\Model
       }
     }
 
+    $recipient = trim($this->getEinvoiceApp()->providers()->providerConfigAsString('notificationEmail'));
+    if ($inboundOutbound === self::INBOUND && $recipient !== '' && $updates['status'] !== self::STATUS_FAILED
+      && (!$export || (int) $export->status === self::STATUS_FAILED)) {
+      $payload = json_decode($updates['peppol_response'], true) ?: [];
+      if (empty($payload['inboundNotification'])) {
+        $updates['peppol_response'] = $this->mergeResponsePayload($updates['peppol_response'], [
+          'inboundNotification' => ['status' => 'pending'],
+        ]);
+      }
+    }
+
     if ($export) {
       $wasLinked = empty($export->id_invoice) && $invoice;
       $changed = false;
@@ -602,6 +630,7 @@ class Einvoice extends \Hubleto\Erp\Model
       if ($wasLinked) {
         $summary['linked']++;
       }
+      $this->processInboundDocument((int) $export->id, $summary);
       return;
     }
 
@@ -609,6 +638,57 @@ class Einvoice extends \Hubleto\Erp\Model
     $summary['imported']++;
     if (!empty($savedRecord['id_invoice'])) {
       $summary['linked']++;
+    }
+    $this->processInboundDocument((int) $savedRecord['id'], $summary);
+  }
+
+  private function getEinvoiceApp(): Loader
+  {
+    return $this->appManager()->getApp(Loader::class);
+  }
+
+  private function processInboundDocument(int $id, array &$summary): void
+  {
+    $export = $this->record->find($id);
+    if (!$export || (int) $export->inbound_outbound !== self::INBOUND
+      || (int) $export->status === self::STATUS_FAILED) return;
+
+    $app = $this->getEinvoiceApp();
+    if (empty($export->id_invoice) && $app->providers()->providerConfigAsString('autoCreateInvoices', '0') === '1') {
+      try {
+        $result = (new InboundInvoiceImporter($app))->import($id);
+        $summary[$result['created'] ? 'hubletoInvoicesCreated' : 'hubletoInvoicesLinked']++;
+      } catch (\Throwable $e) {
+        $summary['autoImportFailed']++;
+        $summary['warnings'][] = 'Hubleto invoice for e-Invoice #' . $id . ' could not be created: ' . $e->getMessage();
+        $this->createLogRecord($id, 'hubleto_invoice_import', Log::STATUS_ERROR, $e->getMessage());
+      }
+    }
+
+    $export = $this->record->find($id);
+    $payload = json_decode((string) $export->peppol_response, true) ?: [];
+    $recipient = trim($app->providers()->providerConfigAsString('notificationEmail'));
+    if ($recipient === '' || ($payload['inboundNotification']['status'] ?? '') !== 'pending') return;
+    try {
+      if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) throw new \Exception('Invalid notification email address.');
+      $escape = fn (string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+      $url = rtrim($this->env()->projectUrl, '/') . '/einvoice/' . $id;
+      $body = '<p>' . $escape($this->translate('A new inbound e-Invoice was received.')) . '</p>'
+        . '<p>' . $escape((string) $export->invoice_number) . '</p>'
+        . '<p><a href="' . $escape($url) . '">' . $escape($this->translate('Open e-Invoice')) . '</a></p>';
+      /** @var EmailProvider $emailProvider */
+      $emailProvider = $this->getService(EmailProvider::class);
+      if (!$emailProvider->send($recipient, $this->translate('New inbound e-Invoice'), $body)) {
+        throw new \Exception('The email provider did not confirm sending the notification.');
+      }
+      $export->update(['peppol_response' => $this->mergeResponsePayload((string) $export->peppol_response, [
+        'inboundNotification' => ['status' => 'sent', 'sentAt' => date('Y-m-d H:i:s')],
+      ])]);
+      $summary['notificationsSent']++;
+      $this->createLogRecord($id, 'inbound_notification', Log::STATUS_SUCCESS, 'Inbound invoice notification sent.');
+    } catch (\Throwable $e) {
+      $summary['warnings'][] = 'Notification for e-Invoice #' . $id . ' could not be sent: ' . $e->getMessage();
+      $this->createLogRecord($id, 'inbound_notification', Log::STATUS_ERROR, $e->getMessage());
     }
   }
 

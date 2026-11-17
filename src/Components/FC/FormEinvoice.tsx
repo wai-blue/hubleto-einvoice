@@ -76,7 +76,7 @@ export const callEinvoiceAction = async (
   return json;
 };
 
-const getErrorMessage = (error: unknown, fallback: string): string => {
+export const getErrorMessage = (error: unknown, fallback: string): string => {
   return error instanceof Error && error.message ? error.message : fallback;
 };
 
@@ -121,7 +121,7 @@ const InboundInvoiceAction = () => {
 };
 
 /** TabDefault */
-const TabDefault = (props: FormEinvoiceProps) => {
+const TabDefault = () => {
   return <div>
     <Input field='id_invoice' />
     <Input field='inbound_outbound' />
@@ -144,9 +144,7 @@ const HeaderLeft = () => {
   const transmissionId = useRecordField<string>('transmission_id', '');
   const status = Number(useRecordField<number>('status', 0));
 
-  if (form.id <= 0) return form.renderDefaultHeaderLeft();
-  if (direction === 1) return form.renderDefaultHeaderLeft();
-  if (status === 5) return form.renderDefaultHeaderLeft();
+  if (form.id <= 0 || direction === 1 || status === 5) return null;
 
   const canSend = direction === 2 && !transmissionId && [0, 1, 4].includes(status);
 
@@ -218,12 +216,16 @@ const FormEinvoice = (props: FormEinvoiceProps) => {
     parentApp={parentApp}
     model={parentApp + '/Models/Einvoice'}
     urlSlug='einvoice'
-    endpointParams={{}}
     title={{field: 'invoice_number', sub: T.translate('e-Invoice')}}
-    tabs={{default: {content: () => <TabDefault {...props} />}}}
+    tabs={{default: {content: () => <TabDefault />}}}
     renderHeaderLeft={() => <HeaderLeft />}
     renderFooter={() => <Footer />}
     {...props}
+    readonly={true}
+    permissions={{canCreate: false, canUpdate: false, canDelete: false}}
+    renderSaveButton={() => null}
+    renderCopyButton={() => null}
+    renderDeleteButton={() => null}
   ></Form>;
 };
 

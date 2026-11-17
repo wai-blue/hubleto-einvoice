@@ -7,8 +7,10 @@
     "php": "^8.2",
     "ext-curl": "*",
     "ext-dom": "*",
+    "ext-openssl": "*",
     "ext-simplexml": "*",
-    "num-num/ubl-invoice": "^2.4"
+    "num-num/ubl-invoice": "^2.4",
+    "phpmailer/phpmailer": "^6.12"
   },
   "autoload": {
     "psr-4": {

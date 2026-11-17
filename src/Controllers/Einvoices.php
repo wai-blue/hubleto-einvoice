@@ -2,8 +2,9 @@
 
 namespace Hubleto\App\External\WaiBlue\Einvoice\Controllers;
 
-use Hubleto\App\External\WaiBlue\Einvoice\Crons\SyncEinvoiceStatuses;
+use Hubleto\App\External\WaiBlue\Einvoice\Loader;
 use Hubleto\App\External\WaiBlue\Einvoice\Models\Einvoice;
+use Hubleto\App\External\WaiBlue\Einvoice\Services\Synchronization;
 use Hubleto\Erp\Controller;
 
 class Einvoices extends Controller
@@ -16,35 +17,22 @@ class Einvoices extends Controller
     parent::init();
 
     if ($this->router()->urlParamAsString('action') === 'sync-invoices') {
-      /** @var Einvoice $mEinvoice */
-      $mEinvoice = $this->getModel(Einvoice::class);
-      $app = $this->getEinvoiceApp();
-      $position = json_decode($app->providers()->providerConfigAsString('invoiceSyncPosition'), true);
-
       try {
-        $this->invoiceSyncResult = $mEinvoice->syncProviderDocuments(
-          100,
-          is_array($position) ? $position : [],
-        );
-        $app->providers()->saveProviderConfigValue(
-          'invoiceSyncPosition',
-          json_encode($this->invoiceSyncResult['nextPosition'], JSON_UNESCAPED_SLASHES) ?: '',
-        );
-        $app->providers()->saveProviderConfigValue('lastInvoiceSyncAt', date('Y-m-d H:i:s'));
+        $result = (new Synchronization($this->getEinvoiceApp()))->run(true, false);
+        $this->invoiceSyncResult = $result['documents'];
+        $this->invoiceSyncError = implode(' ', $result['errors']) ?: null;
       } catch (\Throwable $e) {
         $this->invoiceSyncError = $e->getMessage();
       }
     }
 
-    // FOR TESTING ONLY - DELETE LATER
     if ($this->router()->urlParamAsString('action') === 'sync-statuses') {
-      /** @var SyncEinvoiceStatuses $syncCron */
-      $syncCron = $this->getService(SyncEinvoiceStatuses::class);
-      $syncCron->run();
-      $this->getEinvoiceApp()->providers()->saveProviderConfigValue('lastStatusSyncAt', date('Y-m-d H:i:s'));
-
-      header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? ($this->env()->projectUrl . '/einvoice')));
-      exit;
+      try {
+        $result = (new Synchronization($this->getEinvoiceApp()))->run(false, true);
+        $this->invoiceSyncError = implode(' ', $result['errors']) ?: null;
+      } catch (\Throwable $e) {
+        $this->invoiceSyncError = $e->getMessage();
+      }
     }
 
     if ($this->router()->urlParamAsString('action') === 'download') {
@@ -88,11 +76,12 @@ class Einvoices extends Controller
     parent::prepareView();
     $this->viewParams['invoiceSyncResult'] = $this->invoiceSyncResult;
     $this->viewParams['invoiceSyncError'] = $this->invoiceSyncError;
+    $this->viewParams['lastSynchronization'] = (new Synchronization($this->getEinvoiceApp()))->lastResult();
     $this->setView('@Hubleto:App:External:WaiBlue:Einvoice/Einvoices.twig');
   }
 
-  private function getEinvoiceApp(): \Hubleto\App\External\WaiBlue\Einvoice\Loader
+  private function getEinvoiceApp(): Loader
   {
-    return $this->appManager()->getApp(\Hubleto\App\External\WaiBlue\Einvoice\Loader::class);
+    return $this->appManager()->getApp(Loader::class);
   }
 }
