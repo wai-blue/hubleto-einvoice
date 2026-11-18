@@ -16,37 +16,16 @@ through providers connected to Hubleto.
 
 ## Installation
 
-Requires an existing Hubleto installation, PHP 8.2 or newer, and the curl, DOM
-and SimpleXML extensions. Required Hubleto apps are listed in `src/manifest.yaml`.
+Requires an existing Hubleto installation, PHP 8.2 or newer, and the curl, DOM,
+OpenSSL and SimpleXML extensions. Required Hubleto apps are listed in
+`src/manifest.yaml`.
 
+The app is available on [Packagist](https://packagist.org/packages/wai-blue/hubleto-einvoice).
+Follow the standard [Hubleto external app installation](https://www.hubleto.eu/en/apps/external)
+below. Cloning this repository or adding a custom Composer repository is not
+required when installing from Packagist.
 
-### 1. Add the local repository
-
-Place this repository alongside your Hubleto project, for example:
-
-```text
-www/
-  hubleto/
-  hubleto-einvoice/
-```
-
-In the Hubleto project's `composer.json`, add the following entry to
-`repositories`, keeping any existing repository entries:
-
-```json
-{
-  "repositories": {
-    "wai-blue/hubleto-einvoice": {
-      "type": "path",
-      "url": "../hubleto-einvoice"
-    }
-  }
-}
-```
-
-Adjust the path if your directory layout differs.
-
-### 2. Install the Composer package
+### 1. Install the Composer package
 
 Run from the Hubleto project's root:
 
@@ -54,10 +33,20 @@ Run from the Hubleto project's root:
 composer require wai-blue/hubleto-einvoice
 ```
 
-Composer installs the package and its UBL library dependency and configures
-autoloading for the external app.
+Only alpha releases are currently published. If your Hubleto project only allows
+stable packages, explicitly allow alpha versions for this app:
 
-### 3. Install the app in Hubleto
+```sh
+composer require "wai-blue/hubleto-einvoice:^2.0@alpha"
+```
+
+Use either command as appropriate for your project's stability settings. There
+is no need to lower the stability requirement for the entire project.
+
+Composer installs the package, its UBL library and PHPMailer dependencies, and
+configures autoloading for the external app.
+
+### 2. Install the app in Hubleto
 
 From the same Hubleto project directory, run:
 
