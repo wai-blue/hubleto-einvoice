@@ -1,8 +1,9 @@
 <h1 class="app-main-title">{{ translate('e-Invoice') }}</h1>
 
 {% set sync = viewParams.lastSynchronization %}
+<div class="flex flex-col md:flex-row items-start gap-4 mb-4">
 {% if sync.startedAt %}
-  <div class="card p-4 mb-4" role="status">
+  <div class="card p-4 flex-1 min-w-0" role="status">
     <div class="flex flex-wrap items-center gap-2">
       <strong>{{ translate('Last synchronization') }}</strong>
       <span class="badge {{ sync.status == 'success' ? 'badge-success' : (sync.status == 'running' ? 'badge-info' : (sync.status == 'error' ? 'badge-danger' : 'badge-warning')) }}">{{ translate(sync.status) }}</span>
@@ -26,23 +27,15 @@
     {% endfor %}
   </div>
 {% else %}
-  <div class="text-sm text-gray-500 mb-4">{{ translate('No synchronization result has been recorded yet. Use Sync from provider or wait for the next scheduled synchronization.') }}</div>
+  <div class="text-sm text-gray-500 flex-1">{{ translate('No synchronization result has been recorded yet. Use Sync from provider or wait for the next scheduled synchronization.') }}</div>
 {% endif %}
+  <div class="card p-4 shrink-0" role="status">
+    <strong>{{ translate('Outbound invoices to send') }}</strong>
+    <div class="text-sm mt-2">{{ viewParams.outboundToSend }}</div>
+  </div>
+</div>
 
 {% if viewParams.invoiceSyncResult %}
-  <div class="badge badge-info mb-2">
-    {{ translate('Provider invoices synchronized.') }}
-    {{ translate('Found') }}: {{ viewParams.invoiceSyncResult.found }},
-    {{ translate('Imported') }}: {{ viewParams.invoiceSyncResult.imported }},
-    {{ translate('Updated') }}: {{ viewParams.invoiceSyncResult.updated }},
-    {{ translate('Linked') }}: {{ viewParams.invoiceSyncResult.linked }},
-    {{ translate('Unchanged') }}: {{ viewParams.invoiceSyncResult.unchanged }}.
-    {% if viewParams.invoiceSyncResult.cycleCompleted %}
-      {{ translate('All provider invoices were checked.') }}
-    {% else %}
-      {{ translate('Click sync again to process the next batch.') }}
-    {% endif %}
-  </div>
   {% for warning in viewParams.invoiceSyncResult.warnings %}
     <div class="badge badge-warning mb-2">{{ warning }}</div>
   {% endfor %}

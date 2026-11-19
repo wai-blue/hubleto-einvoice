@@ -77,6 +77,7 @@ class Einvoices extends Controller
     $this->viewParams['invoiceSyncResult'] = $this->invoiceSyncResult;
     $this->viewParams['invoiceSyncError'] = $this->invoiceSyncError;
     $this->viewParams['lastSynchronization'] = (new Synchronization($this->getEinvoiceApp()))->lastResult();
+    $this->viewParams['outboundToSend'] = $this->getModel(Einvoice::class)->countOutboundToSend();
     $this->setView('@Hubleto:App:External:WaiBlue:Einvoice/Einvoices.twig');
   }
 

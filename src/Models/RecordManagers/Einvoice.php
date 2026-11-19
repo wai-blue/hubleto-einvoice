@@ -3,6 +3,7 @@
 namespace Hubleto\App\External\WaiBlue\Einvoice\Models\RecordManagers;
 
 use Hubleto\App\Community\Invoices\Models\RecordManagers\Invoice;
+use Hubleto\App\External\WaiBlue\Einvoice\Models\Einvoice as EinvoiceModel;
 use Hubleto\App\External\WaiBlue\Einvoice\Models\RecordManagers\Log;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,6 +11,27 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Einvoice extends \Hubleto\Erp\RecordManager
 {
   public $table = 'einvoices';
+
+  public function recordSave(array $record, int $idMasterRecord = 0, array $saveRelations = [], string $relation = ''): array
+  {
+    return $this->getConnection()->transaction(function () use ($record): array {
+      $original = $this->where('einvoices.id', (int) ($record['id'] ?? 0))->lockForUpdate()->first();
+      if (!$original || !$this->model->getPermissions($original->toArray())[2]) {
+        throw new \Hubleto\Framework\Exceptions\NotEnoughPermissionsException('Cannot change this e-Invoice.');
+      }
+      $status = $record['status'] ?? null;
+      $allowed = [
+        (string) $original->status,
+        (string) EinvoiceModel::STATUS_GENERATED,
+        (string) EinvoiceModel::STATUS_WONT_SEND,
+      ];
+      if ((!is_int($status) && !is_string($status)) || !in_array((string) $status, $allowed, true)) {
+        throw new \Exception('Only the sending preference can be changed manually.');
+      }
+      $original->update(['status' => (int) $status]);
+      return $original->toArray();
+    });
+  }
 
   /** @return BelongsTo<Invoice, covariant Einvoice> */
   public function INVOICE(): BelongsTo
