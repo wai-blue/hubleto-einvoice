@@ -131,18 +131,18 @@ const TabDefault = () => {
     [originalStatus, 1, 5].includes(Number(status)),
   ));
   return <div>
-    <Input field='id_invoice' />
-    <Input field='inbound_outbound' />
-    <Input field='provider' />
-    <Input field='invoice_number' />
-    <Input field='xml_content' />
+    <Input field='id_invoice' customInputProps={{readonly: true}} />
+    <Input field='inbound_outbound' customInputProps={{readonly: true}} />
+    <Input field='provider' customInputProps={{readonly: true}} />
+    <Input field='invoice_number' customInputProps={{readonly: true}} />
+    <Input field='xml_content' customInputProps={{readonly: true}} />
     <Input field='status' customInputProps={{readonly: !form.permissions.canUpdate, enumValues: sendingStatuses}} />
-    <Input field='transmission_id' />
-    <Input field='date_generated' />
-    <Input field='date_sent' />
-    <Input field='date_confirmed' />
-    <Input field='peppol_response' />
-    <Input field='error_message' />
+    <Input field='transmission_id' customInputProps={{readonly: true}} />
+    <Input field='date_generated' customInputProps={{readonly: true}} />
+    <Input field='date_sent' customInputProps={{readonly: true}} />
+    <Input field='date_confirmed' customInputProps={{readonly: true}} />
+    <Input field='peppol_response' customInputProps={{readonly: true}} />
+    <Input field='error_message' customInputProps={{readonly: true}} />
   </div>;
 };
 
