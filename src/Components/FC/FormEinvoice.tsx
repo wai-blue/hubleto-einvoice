@@ -91,6 +91,8 @@ const InboundInvoiceAction = () => {
     return <a
       className='btn btn-primary'
       href={`${globalThis.hubleto.config.projectUrl}/invoices/${invoiceId}`}
+      target='_blank'
+      rel='noopener noreferrer'
     >
       <span className='icon'><i className='fas fa-file-invoice'></i></span>
       <span className='text'>{T.translate('Open Hubleto invoice')}</span>
@@ -122,19 +124,25 @@ const InboundInvoiceAction = () => {
 
 /** TabDefault */
 const TabDefault = () => {
+  const form = React.useContext(FormMetaContext);
+  const statusValues = form.description?.inputs?.status?.enumValues ?? {};
+  const originalStatus = Number(form.originalRecord.status);
+  const sendingStatuses = Object.fromEntries(Object.entries(statusValues).filter(([status]) =>
+    [originalStatus, 1, 5].includes(Number(status)),
+  ));
   return <div>
-    <Input field='id_invoice' />
-    <Input field='inbound_outbound' />
-    <Input field='provider' />
-    <Input field='invoice_number' />
-    <Input field='xml_content' />
-    <Input field='status' />
-    <Input field='transmission_id' />
-    <Input field='date_generated' />
-    <Input field='date_sent' />
-    <Input field='date_confirmed' />
-    <Input field='peppol_response' />
-    <Input field='error_message' />
+    <Input field='id_invoice' customInputProps={{readonly: true}} />
+    <Input field='inbound_outbound' customInputProps={{readonly: true}} />
+    <Input field='provider' customInputProps={{readonly: true}} />
+    <Input field='invoice_number' customInputProps={{readonly: true}} />
+    <Input field='xml_content' customInputProps={{readonly: true}} />
+    <Input field='status' customInputProps={{readonly: !form.permissions.canUpdate, enumValues: sendingStatuses}} />
+    <Input field='transmission_id' customInputProps={{readonly: true}} />
+    <Input field='date_generated' customInputProps={{readonly: true}} />
+    <Input field='date_sent' customInputProps={{readonly: true}} />
+    <Input field='date_confirmed' customInputProps={{readonly: true}} />
+    <Input field='peppol_response' customInputProps={{readonly: true}} />
+    <Input field='error_message' customInputProps={{readonly: true}} />
   </div>;
 };
 
@@ -150,7 +158,7 @@ const HeaderLeft = () => {
 
   return <button
     type='button'
-    className={canSend ? 'btn btn-add btn-large' : 'btn btn-disabled btn-large'}
+    className='btn btn-transparent btn-square'
     disabled={!canSend}
     onClick={async () => {
       try {
@@ -218,12 +226,13 @@ const FormEinvoice = (props: FormEinvoiceProps) => {
     urlSlug='einvoice'
     title={{field: 'invoice_number', sub: T.translate('e-Invoice')}}
     tabs={{default: {content: () => <TabDefault />}}}
-    renderHeaderLeft={() => <HeaderLeft />}
+    renderHeaderLeft={(form) => <div className='flex items-center gap-2'>
+      {form.renderDefaultHeaderLeft()}
+      <HeaderLeft />
+    </div>}
     renderFooter={() => <Footer />}
     {...props}
-    readonly={true}
-    permissions={{canCreate: false, canUpdate: false, canDelete: false}}
-    renderSaveButton={() => null}
+    readonly={false}
     renderCopyButton={() => null}
     renderDeleteButton={() => null}
   ></Form>;

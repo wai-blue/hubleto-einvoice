@@ -133,7 +133,24 @@ const TableEinvoices = (props: TableEinvoicesProps) => {
       const statusColumn = table.description?.columns.status;
       const statusClass = statusColumn?.enumCssClasses?.[row.status] || '';
       const statusLabel = row['_ENUM[status]'] || statusColumn?.enumValues?.[row.status] || T.translate('Unknown');
-      return <article key={row.id} className='card m-2 min-w-0 max-w-2xl flex-1 basis-80 overflow-hidden flex flex-col'>
+      const canRead = !row._PERMISSIONS || row._PERMISSIONS[1];
+      return <article key={row.id}
+        className={'card m-2 min-w-0 max-w-2xl flex-1 basis-80 overflow-hidden flex flex-col' + (canRead ? ' cursor-pointer' : '')}
+        role='button'
+        tabIndex={canRead ? 0 : undefined}
+        aria-label={String(row.invoice_number || `#${row.id}`)}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget || !canRead) return;
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            table.openForm(row.id);
+          }
+        }}
+        onClick={(event) => {
+          if ((event.target as HTMLElement).closest('a, button, input, select, textarea')) return;
+          if (canRead) table.openForm(row.id);
+        }}
+      >
         <div className='card-header gap-2'>
           <span className='text-xs uppercase tracking-wider'><i className={`fas ${inbound ? 'fa-arrow-down' : 'fa-arrow-up'} mr-2`} />{T.translate(inbound ? 'Inbound' : 'Outbound')}</span>
           <span className={`badge ${statusClass}`}>{statusLabel}</span>
@@ -198,6 +215,8 @@ const TableEinvoices = (props: TableEinvoicesProps) => {
         {direction === 1 && invoiceId > 0 ? <a
             className='btn btn-small btn-transparent text-nowrap'
             href={`${globalThis.hubleto.config.projectUrl}/invoices/${invoiceId}`}
+            target='_blank'
+            rel='noopener noreferrer'
             onClick={(event) => event.stopPropagation()}
             title={T.translate('Open Hubleto invoice')}
           >
@@ -224,6 +243,7 @@ const TableEinvoices = (props: TableEinvoicesProps) => {
             <span className='icon'><i className='fas fa-paper-plane'></i></span>
             <span className='text'>{T.translate('Send to provider')}</span>
           </button> : null}
+        {/* Remote status and XML download remain available in the detail form.
         {transmissionId ? <button
             type='button'
             className='btn btn-small btn-transparent text-nowrap'
@@ -254,6 +274,7 @@ const TableEinvoices = (props: TableEinvoicesProps) => {
           <span className='icon'><i className='fas fa-download'></i></span>
           <span className='text'>{T.translate('Download XML')}</span>
         </a>
+        */}
       </div>;
     }}
     renderForm={(table: TableMeta): React.JSX.Element => {
