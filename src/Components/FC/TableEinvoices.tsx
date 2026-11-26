@@ -133,17 +133,23 @@ const TableEinvoices = (props: TableEinvoicesProps) => {
       const statusColumn = table.description?.columns.status;
       const statusClass = statusColumn?.enumCssClasses?.[row.status] || '';
       const statusLabel = row['_ENUM[status]'] || statusColumn?.enumValues?.[row.status] || T.translate('Unknown');
-      return <article key={row.id} className='card m-2 min-w-0 max-w-2xl flex-1 basis-80 overflow-hidden flex flex-col'>
+      const canRead = !row._PERMISSIONS || row._PERMISSIONS[1];
+      const invoiceNumber = row.invoice_number || `#${row.id}`;
+      return <article key={row.id} className='card relative m-2 min-w-0 max-w-2xl flex-1 basis-80 overflow-hidden flex flex-col'>
         <div className='card-header gap-2'>
           <span className='text-xs uppercase tracking-wider'><i className={`fas ${inbound ? 'fa-arrow-down' : 'fa-arrow-up'} mr-2`} />{T.translate(inbound ? 'Inbound' : 'Outbound')}</span>
           <span className={`badge ${statusClass}`}>{statusLabel}</span>
         </div>
         <div className='card-body p-4'>
-          <a className='block text-lg font-bold break-words' href={`${globalThis.hubleto.config.projectUrl}/einvoice/${row.id}`} onClick={(event) => {
-            if (event.ctrlKey || event.metaKey) return;
-            event.preventDefault();
-            if (!row._PERMISSIONS || row._PERMISSIONS[1]) table.openForm(row.id);
-          }}>{row.invoice_number || `#${row.id}`}</a>
+          {canRead ? <a
+            className='block text-lg font-bold break-words after:absolute after:inset-0'
+            href={`${globalThis.hubleto.config.projectUrl}/einvoice/${row.id}`}
+            onClick={(event) => {
+              if (event.ctrlKey || event.metaKey) return;
+              event.preventDefault();
+              table.openForm(row.id);
+            }}
+          >{invoiceNumber}</a> : <span className='block text-lg font-bold break-words'>{invoiceNumber}</span>}
           <div className='text-sm text-gray-500 mb-4'>{summary ? T.translate(summary.type) : T.translate('e-Invoice')} / {row.provider}</div>
           {summary ? <>
             <div className='font-semibold break-words'>{inbound ? summary.supplier : summary.customer}</div>
@@ -161,7 +167,7 @@ const TableEinvoices = (props: TableEinvoicesProps) => {
           </> : <p className='text-sm text-gray-500'>{T.translate('XML preview unavailable')}</p>}
           {row.error_message ? <p className='alert alert-danger text-sm mt-3 break-words'>{row.error_message}</p> : null}
         </div>
-        <div className='card-footer'>{table.props.renderActionsColumn?.(table, row)}</div>
+        <div className='card-footer relative z-10'>{table.props.renderActionsColumn?.(table, row)}</div>
       </article>;
     }}
     renderActionsColumn={(table: TableMeta, row: any) => {
@@ -198,13 +204,15 @@ const TableEinvoices = (props: TableEinvoicesProps) => {
         {direction === 1 && invoiceId > 0 ? <a
             className='btn btn-small btn-transparent text-nowrap'
             href={`${globalThis.hubleto.config.projectUrl}/invoices/${invoiceId}`}
+            target='_blank'
+            rel='noopener noreferrer'
             onClick={(event) => event.stopPropagation()}
             title={T.translate('Open Hubleto invoice')}
           >
             <span className='icon'><i className='fas fa-file-invoice'></i></span>
             <span className='text'>{T.translate('Open Hubleto invoice')}</span>
           </a> : null}
-        {direction === 2 && status !== 5 ? <button
+        {row._PERMISSIONS?.[2] && direction === 2 && status !== 5 ? <button
             type='button'
             className='btn btn-small btn-transparent text-nowrap'
             disabled={!canSend}
@@ -224,6 +232,7 @@ const TableEinvoices = (props: TableEinvoicesProps) => {
             <span className='icon'><i className='fas fa-paper-plane'></i></span>
             <span className='text'>{T.translate('Send to provider')}</span>
           </button> : null}
+        {/* Remote status and XML download remain available in the detail form.
         {transmissionId ? <button
             type='button'
             className='btn btn-small btn-transparent text-nowrap'
@@ -254,6 +263,7 @@ const TableEinvoices = (props: TableEinvoicesProps) => {
           <span className='icon'><i className='fas fa-download'></i></span>
           <span className='text'>{T.translate('Download XML')}</span>
         </a>
+        */}
       </div>;
     }}
     renderForm={(table: TableMeta): React.JSX.Element => {

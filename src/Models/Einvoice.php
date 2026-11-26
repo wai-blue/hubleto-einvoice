@@ -15,6 +15,7 @@ use Hubleto\Framework\Db\Column\Lookup;
 use Hubleto\Framework\Db\Column\Text;
 use Hubleto\Framework\Db\Column\Varchar;
 use Hubleto\Framework\Enums\InstalledMigrationEnum;
+use Hubleto\Framework\Exceptions\NotEnoughPermissionsException;
 
 class Einvoice extends \Hubleto\Erp\Model
 {
@@ -85,6 +86,14 @@ class Einvoice extends \Hubleto\Erp\Model
     $description->show(['header', 'fulltextSearch', 'columnSearch', 'moreActionsButton']);
     $description->show(['footer']);
 
+    $description->addFilter('fInboundOutbound', [
+      'direction' => 'horizontal',
+      'options' => [
+        self::INBOUND => $this->translate('Inbound'),
+        self::OUTBOUND => $this->translate('Outbound'),
+      ],
+    ]);
+
     $description->addFilter('fStatus', [
       'title' => $this->translate('Status'),
       'options' => [
@@ -97,25 +106,19 @@ class Einvoice extends \Hubleto\Erp\Model
       ]
     ]);
 
-    $description->addFilter('fInboundOutbound', [
-      'direction' => 'horizontal',
-      'options' => [
-        self::INBOUND => $this->translate('Inbound'),
-        self::OUTBOUND => $this->translate('Outbound'),
-      ],
-    ]);
-
     return $description;
   }
 
   public function describeForm(): \Hubleto\Framework\Description\Form
   {
     $description = parent::describeForm();
-    $description->ui['readonly'] = true;
-    $description->ui['showSaveButton'] = false;
+    foreach ($description->inputs as $name => $input) {
+      $input->setReadonly($name !== 'status');
+    }
+    $description->ui['showSaveButton'] = true;
     $description->ui['showCopyButton'] = false;
     $description->ui['showDeleteButton'] = false;
-    foreach (['canCreate', 'canUpdate', 'canDelete'] as $permission) {
+    foreach (['canCreate', 'canDelete'] as $permission) {
       $description->permissions[$permission] = false;
     }
     return $description;
@@ -124,7 +127,26 @@ class Einvoice extends \Hubleto\Erp\Model
   public function getPermissions(array $record): array
   {
     $permissions = parent::getPermissions($record);
-    return [false, $permissions[1], false, false];
+    return [false, $permissions[1], $permissions[2] && $this->canChangeSendingStatus($record), false];
+  }
+
+  public function canChangeSendingStatus(array $record): bool
+  {
+    return (int) ($record['id'] ?? 0) > 0
+      && (int) ($record['inbound_outbound'] ?? 0) === self::OUTBOUND
+      && trim((string) ($record['transmission_id'] ?? '')) === ''
+      && in_array((int) ($record['status'] ?? -1), [
+        self::STATUS_PENDING, self::STATUS_GENERATED, self::STATUS_FAILED, self::STATUS_WONT_SEND,
+      ], true);
+  }
+
+  public function countOutboundToSend(): int
+  {
+    return $this->record->where('inbound_outbound', self::OUTBOUND)
+      ->whereIn('status', [self::STATUS_PENDING, self::STATUS_GENERATED, self::STATUS_FAILED])
+      ->where(function ($query) {
+        $query->whereNull('transmission_id')->orWhere('transmission_id', '');
+      })->count();
   }
 
   public function onBeforeCreate(array $record): array
@@ -263,6 +285,10 @@ class Einvoice extends \Hubleto\Erp\Model
     $export = $this->record->find($exportId);
     if (!$export) {
       throw new \Exception($this->translate('e-Invoice not found'));
+    }
+    $permissions = $this->getPermissions($export->toArray());
+    if (!$permissions[1] || !$permissions[2]) {
+      throw new NotEnoughPermissionsException($this->translate('Cannot send e-Invoice. Not enough permissions.'));
     }
     if (empty($export->xml_content)) {
       throw new \Exception($this->translate('XML content is missing'));
