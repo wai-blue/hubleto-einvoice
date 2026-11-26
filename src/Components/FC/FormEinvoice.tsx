@@ -152,7 +152,7 @@ const HeaderLeft = () => {
   const transmissionId = useRecordField<string>('transmission_id', '');
   const status = Number(useRecordField<number>('status', 0));
 
-  if (form.id <= 0 || direction === 1 || status === 5) return null;
+  if (!form.permissions.canUpdate || form.id <= 0 || direction === 1 || status === 5) return null;
 
   const canSend = direction === 2 && !transmissionId && [0, 1, 4].includes(status);
 

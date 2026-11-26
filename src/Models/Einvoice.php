@@ -15,6 +15,7 @@ use Hubleto\Framework\Db\Column\Lookup;
 use Hubleto\Framework\Db\Column\Text;
 use Hubleto\Framework\Db\Column\Varchar;
 use Hubleto\Framework\Enums\InstalledMigrationEnum;
+use Hubleto\Framework\Exceptions\NotEnoughPermissionsException;
 
 class Einvoice extends \Hubleto\Erp\Model
 {
@@ -284,6 +285,10 @@ class Einvoice extends \Hubleto\Erp\Model
     $export = $this->record->find($exportId);
     if (!$export) {
       throw new \Exception($this->translate('e-Invoice not found'));
+    }
+    $permissions = $this->getPermissions($export->toArray());
+    if (!$permissions[1] || !$permissions[2]) {
+      throw new NotEnoughPermissionsException($this->translate('Cannot send e-Invoice. Not enough permissions.'));
     }
     if (empty($export->xml_content)) {
       throw new \Exception($this->translate('XML content is missing'));
